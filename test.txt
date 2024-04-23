@@ -1,0 +1,64 @@
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-oauth2-client</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.security</groupId>
+        <artifactId>spring-security-oauth2-jose</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+</dependencies>
+
+
+
+spring.security.oauth2.client.registration.myclient.client-id=client-id
+spring.security.oauth2.client.registration.myclient.client-secret=client-secret
+spring.security.oauth2.client.registration.myclient.authorization-grant-type=authorization_code
+spring.security.oauth2.client.registration.myclient.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
+spring.security.oauth2.client.registration.myclient.scope=openid,profile,email
+spring.security.oauth2.client.provider.myclient.authorization-uri=https://example.com/oauth/authorize
+spring.security.oauth2.client.provider.myclient.token-uri=https://example.com/oauth/token
+spring.security.oauth2.client.provider.myclient.user-info-uri=https://example.com/userinfo
+spring.security.oauth2.client.provider.myclient.user-name-attribute=name
+
+
+
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests(authorize -> authorize
+                .antMatchers("/").permitAll()
+                .anyRequest().authenticated()
+            )
+            .oauth2Login();
+    }
+}
+
+
+
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+    }
+}
