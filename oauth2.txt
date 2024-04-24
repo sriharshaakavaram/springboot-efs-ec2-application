@@ -1,0 +1,70 @@
+<dependencies>
+    <!-- Spring Boot Starter Web -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
+    <!-- Spring Boot Starter Security -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
+    <!-- OAuth2 Client -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-oauth2-client</artifactId>
+    </dependency>
+
+    <!-- OAuth2 JOSE for JWT handling -->
+    <dependency>
+        <groupId>org.springframework.security</groupId>
+        <artifactId>spring-security-oauth2-jose</artifactId>
+    </dependency>
+</dependencies>
+
+
+--------------------
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          custom-client:
+            client-id: your-client-id
+            client-secret: your-client-secret
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: user_info
+            client-name: Custom Client
+        provider:
+          custom-client:
+            authorization-uri: your-authorization-uri
+            token-uri: your-token-uri
+            user-info-uri: your-user-info-uri
+            user-name-attribute: name
+
+
+
+---------------------------
+
+
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests(authorize -> authorize
+                .antMatchers("/", "/error", "/webjars/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .oauth2Login();
+    }
+}
