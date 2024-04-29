@@ -1,93 +1,11 @@
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-oauth2-client</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.security</groupId>
-        <artifactId>spring-security-oauth2-jose</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-</dependencies>
-
-
-
-spring.security.oauth2.client.registration.myclient.client-id=client-id
-spring.security.oauth2.client.registration.myclient.client-secret=client-secret
-spring.security.oauth2.client.registration.myclient.authorization-grant-type=authorization_code
-spring.security.oauth2.client.registration.myclient.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
-spring.security.oauth2.client.registration.myclient.scope=openid,profile,email
-spring.security.oauth2.client.provider.myclient.authorization-uri=https://example.com/oauth/authorize
-spring.security.oauth2.client.provider.myclient.token-uri=https://example.com/oauth/token
-spring.security.oauth2.client.provider.myclient.user-info-uri=https://example.com/userinfo
-spring.security.oauth2.client.provider.myclient.user-name-attribute=name
-
-
-
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-
-@EnableWebSecurity
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            .authorizeRequests(authorize -> authorize
-                .antMatchers("/").permitAll()
-                .anyRequest().authenticated()
-            )
-            .oauth2Login();
-    }
-}
-
-
-
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class MyApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(MyApplication.class, args);
-    }
-}
-
-
-
-
-
-
-
-
-
--------------------------------------------------------
-
-import com.microsoft.aad.msal4j.ClientCredentialFactory;
-import com.microsoft.aad.msal4j.ConfidentialClientApplication;
-import com.microsoft.aad.msal4j.IConfidentialClientApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class MsalConfig {
-
-    @Bean
-    public IConfidentialClientApplication confidentialClientApplication() throws Exception {
-        return ConfidentialClientApplication.builder(
-                "your-client-id",
-                ClientCredentialFactory.createFromSecret("your-client-secret"))
-                .authority("https://login.microsoftonline.com/your-tenant-id/")
-                .build();
-    }
-}
+azure:
+  active-directory:
+    client-id: <your-client-id>
+    client-secret: <your-client-secret>
+    tenant-id: <your-tenant-id> # If not in the authority
+    user-group:
+      allowed-groups: <optional-comma-separated-group-names> # For group-membership checks
+  spring-cloud-azure-starter-active-directory: 
+    authorization-clients:
+      graph: # Name used to reference the client
+        scopes: <comma-separated-scopes> # e.g., user.read
