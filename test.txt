@@ -1,63 +1,13 @@
-<dependencies>
-    <dependency>
-        <groupId>com.azure</groupId>
-        <artifactId>azure-identity</artifactId>
-        <version>1.2.3</version> <!-- Check for the latest version -->
-    </dependency>
-    <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>msal4j</artifactId>
-        <version>1.9.1</version> <!-- Check for the latest version -->
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-</dependencies>
-
-
-
-
-----------------------------------------------------
-
-
-azure.activedirectory.client-id=your-client-id
-azure.activedirectory.client-secret=your-client-secret
-azure.activedirectory.authority=https://login.microsoftonline.com/your-tenant-id
-azure.activedirectory.scope=api://your-api-scope/.default
-
-----------------------------------------------------
-
-import com.microsoft.aad.msal4j.ClientCredentialFactory;
-import com.microsoft.aad.msal4j.ClientCredentialParameters;
-import com.microsoft.aad.msal4j.ConfidentialClientApplication;
-import com.microsoft.aad.msal4j.IAuthenticationResult;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.microsoft.aad.msal4j.*;
 
 import java.net.MalformedURLException;
 import java.util.Collections;
-import java.util.Set;
 
 @Configuration
 public class AzureAdConfig {
-
-    @Value("${azure.activedirectory.client-id}")
-    private String clientId;
-
-    @Value("${azure.activedirectory.client-secret}")
-    private String clientSecret;
-
-    @Value("${azure.activedirectory.authority}")
-    private String authority;
-
-    @Value("${azure.activedirectory.scope}")
-    private Set<String> scopes;
+    // existing configurations...
 
     @Bean
     public ConfidentialClientApplication confidentialClientApplication() throws MalformedURLException {
@@ -67,30 +17,39 @@ public class AzureAdConfig {
     }
 
     @Bean
-    public IAuthenticationResult authenticate() throws Exception {
-        ClientCredentialParameters parameters = ClientCredentialParameters.builder(scopes).build();
-        return confidentialClientApplication().acquireToken(parameters).join();
+    public IAuthenticationResultProvider authenticationResultProvider() {
+        return () -> {
+            ClientCredentialParameters parameters = ClientCredentialParameters.builder(Collections.singleton(scope)).build();
+            return confidentialClientApplication().acquireToken(parameters).join();
+        };
     }
 }
 
 
+--------------------------
 
 
+public interface IAuthenticationResultProvider {
+    IAuthenticationResult getAuthenticationResult() throws Exception;
+}
 
-import com.microsoft.aad.msal4j.IAuthenticationResult;
+
+------------------
+
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import java.util.Map;
 
 @RestController
 public class ClaimsController {
 
     @Autowired
-    private IAuthenticationResult authenticationResult;
+    private IAuthenticationResultProvider authResultProvider;
 
     @GetMapping("/claims")
-    public Map<String, ?> getClaims() {
-        return authenticationResult.account().claims();
+    public Map<String, ?> getClaims() throws Exception {
+        IAuthenticationResult result = authResultProvider.getAuthenticationResult();
+        return result.account().claims();
     }
 }
