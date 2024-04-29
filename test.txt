@@ -1,11 +1,28 @@
-azure:
-  active-directory:
-    client-id: <your-client-id>
-    client-secret: <your-client-secret>
-    tenant-id: <your-tenant-id> # If not in the authority
-    user-group:
-      allowed-groups: <optional-comma-separated-group-names> # For group-membership checks
-  spring-cloud-azure-starter-active-directory: 
-    authorization-clients:
-      graph: # Name used to reference the client
-        scopes: <comma-separated-scopes> # e.g., user.read
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.authorizeRequests()
+                .anyRequest().authenticated()
+                .and().oauth2Login(); 
+    }
+}
+
+
+
+-------------------------------------------
+
+
+@RestController
+public class HomeController {
+    @GetMapping("/")
+    public String home(Principal principal) {
+        OAuth2AuthenticationToken token = (OAuth2AuthenticationToken) principal;
+        return "Hello, " + token.getPrincipal().getName() + "! Here are some claims: " + token.getPrincipal().getAttributes();
+    }
+}
+
+
+=======================================
+
+
