@@ -62,3 +62,32 @@ public class MyApplication {
         SpringApplication.run(MyApplication.class, args);
     }
 }
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------
+
+import com.microsoft.aad.msal4j.ClientCredentialFactory;
+import com.microsoft.aad.msal4j.ConfidentialClientApplication;
+import com.microsoft.aad.msal4j.IConfidentialClientApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class MsalConfig {
+
+    @Bean
+    public IConfidentialClientApplication confidentialClientApplication() throws Exception {
+        return ConfidentialClientApplication.builder(
+                "your-client-id",
+                ClientCredentialFactory.createFromSecret("your-client-secret"))
+                .authority("https://login.microsoftonline.com/your-tenant-id/")
+                .build();
+    }
+}
