@@ -72,3 +72,25 @@ public class AzureAdConfig {
         return confidentialClientApplication().acquireToken(parameters).join();
     }
 }
+
+
+
+
+
+import com.microsoft.aad.msal4j.IAuthenticationResult;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import java.util.Map;
+
+@RestController
+public class ClaimsController {
+
+    @Autowired
+    private IAuthenticationResult authenticationResult;
+
+    @GetMapping("/claims")
+    public Map<String, ?> getClaims() {
+        return authenticationResult.account().claims();
+    }
+}
