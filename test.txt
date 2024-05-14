@@ -29,3 +29,31 @@ public class HomeController {
         return Map.of("aud", "12345", "iss", "www.google.com");
     }
 }
+
+
+
+
+
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Home Page</title>
+</head>
+<body>
+<table>
+    <thead>
+        <tr>
+            <th>Audience</th>
+            <th>Issuer</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td th:text="${claims['aud']}">12345</td>
+            <td th:text="${claims['iss']}">www.google.com</td>
+        </tr>
+    </tbody>
+</table>
+</body>
+</html>
