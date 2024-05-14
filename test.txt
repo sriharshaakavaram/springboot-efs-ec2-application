@@ -1,4 +1,31 @@
-location / {
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_pass http://backend;
+package com.example.demo;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Map;
+
+@Controller
+public class HomeController {
+
+    @GetMapping("/home")
+    public String home(HttpServletRequest request, Model model) {
+        String tokenJson = request.getHeader("Oidc-Id-Token");
+        // Assume tokenJson is a JSON string that needs to be parsed into a Map
+        // You would need a JSON parser here, like Jackson or Gson
+        // For simplicity, assume it is already parsed into a Map
+        Map<String, Object> claims = parseTokenJson(tokenJson);
+
+        model.addAttribute("claims", claims);
+        return "homepage";  // Name of the Thymeleaf template
+    }
+
+    private Map<String, Object> parseTokenJson(String json) {
+        // parse JSON string to Map
+        // This is a placeholder
+        return Map.of("aud", "12345", "iss", "www.google.com");
+    }
 }
