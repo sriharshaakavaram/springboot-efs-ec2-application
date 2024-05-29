@@ -1,59 +1,116 @@
-package com.example.demo;
+Certainly! Here's a simple Python Flask application that allows you to upload files to an Amazon S3 bucket and returns a clickable URL for the uploaded file. 
 
-import org.springframework.http.HttpHeaders;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
+First, make sure you have Flask, Boto3, and other necessary dependencies installed. You can install them using pip:
 
-import javax.servlet.http.HttpServletRequest;
-import java.util.Map;
+```bash
+pip install Flask boto3
+```
 
-@Controller
-public class HomeController {
+Next, create a new file for your Flask application (e.g., `app.py`) and add the following code:
 
-    @GetMapping("/home")
-    public String home(HttpServletRequest request, Model model) {
-        String tokenJson = request.getHeader("Oidc-Id-Token");
-        // Assume tokenJson is a JSON string that needs to be parsed into a Map
-        // You would need a JSON parser here, like Jackson or Gson
-        // For simplicity, assume it is already parsed into a Map
-        Map<String, Object> claims = parseTokenJson(tokenJson);
+```python
+from flask import Flask, request, render_template, redirect, url_for
+import boto3
+from botocore.exceptions import NoCredentialsError
+import os
 
-        model.addAttribute("claims", claims);
-        return "homepage";  // Name of the Thymeleaf template
-    }
+app = Flask(__name__)
 
-    private Map<String, Object> parseTokenJson(String json) {
-        // parse JSON string to Map
-        // This is a placeholder
-        return Map.of("aud", "12345", "iss", "www.google.com");
-    }
-}
+# Configure your AWS credentials and S3 bucket name
+AWS_ACCESS_KEY = 'YOUR_AWS_ACCESS_KEY'
+AWS_SECRET_KEY = 'YOUR_AWS_SECRET_KEY'
+S3_BUCKET_NAME = 'YOUR_S3_BUCKET_NAME'
+S3_REGION_NAME = 'YOUR_S3_REGION_NAME'
 
+# Create an S3 client
+s3 = boto3.client(
+    's3',
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=S3_REGION_NAME
+)
 
+@app.route('/')
+def index():
+    return render_template('index.html')
 
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return 'No file part'
+    file = request.files['file']
+    if file.filename == '':
+        return 'No selected file'
+    if file:
+        try:
+            # Upload the file to S3
+            s3.upload_fileobj(
+                file,
+                S3_BUCKET_NAME,
+                file.filename,
+                ExtraArgs={'ACL': 'public-read'}  # Make the file publicly accessible
+            )
+            # Get the URL of the uploaded file
+            file_url = f"https://{S3_BUCKET_NAME}.s3.{S3_REGION_NAME}.amazonaws.com/{file.filename}"
+            return redirect(url_for('upload_success', file_url=file_url))
+        except NoCredentialsError:
+            return 'Credentials not available'
+        except Exception as e:
+            return str(e)
 
+@app.route('/upload-success')
+def upload_success():
+    file_url = request.args.get('file_url')
+    return render_template('upload_success.html', file_url=file_url)
 
+if __name__ == '__main__':
+    app.run(debug=True)
+```
 
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+Create an `index.html` template for the file upload form in a `templates` directory:
+
+```html
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Home Page</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload File</title>
 </head>
 <body>
-<table>
-    <thead>
-        <tr>
-            <th>Audience</th>
-            <th>Issuer</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td th:text="${claims['aud']}">12345</td>
-            <td th:text="${claims['iss']}">www.google.com</td>
-        </tr>
-    </tbody>
-</table>
+  <h1>Upload File to S3</h1>
+  <form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file">
+    <input type="submit" value="Upload">
+  </form>
 </body>
 </html>
+```
+
+Create an `upload_success.html` template to display the clickable URL after a successful upload:
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Success</title>
+</head>
+<body>
+  <h1>File Uploaded Successfully</h1>
+  <p>Click the link below to view your file:</p>
+  <a href="{{ file_url }}" target="_blank">{{ file_url }}</a>
+</body>
+</html>
+```
+
+Replace `YOUR_AWS_ACCESS_KEY`, `YOUR_AWS_SECRET_KEY`, `YOUR_S3_BUCKET_NAME`, and `YOUR_S3_REGION_NAME` with your actual AWS credentials and S3 bucket details.
+
+Run the Flask application:
+
+```bash
+python app.py
+```
+
+Navigate to `http://127.0.0.1:5000` in your web browser, and you should be able to upload a file and get a clickable link to the uploaded file in your S3 bucket.
