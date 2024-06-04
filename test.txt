@@ -1,33 +1,22 @@
-Certainly! Here's a simple Python Flask application that allows you to upload files to an Amazon S3 bucket and returns a clickable URL for the uploaded file. 
-
-First, make sure you have Flask, Boto3, and other necessary dependencies installed. You can install them using pip:
-
-```bash
-pip install Flask boto3
-```
-
-Next, create a new file for your Flask application (e.g., `app.py`) and add the following code:
+Here's a simple Flask application that allows users to upload and download files to/from an S3 bucket. Make sure you have the `boto3` library installed (`pip install boto3`) and set up your AWS credentials properly.
 
 ```python
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, request, render_template, send_file
 import boto3
-from botocore.exceptions import NoCredentialsError
 import os
 
 app = Flask(__name__)
 
 # Configure your AWS credentials and S3 bucket name
-AWS_ACCESS_KEY = 'YOUR_AWS_ACCESS_KEY'
-AWS_SECRET_KEY = 'YOUR_AWS_SECRET_KEY'
-S3_BUCKET_NAME = 'YOUR_S3_BUCKET_NAME'
-S3_REGION_NAME = 'YOUR_S3_REGION_NAME'
+AWS_ACCESS_KEY_ID = 'your_access_key'
+AWS_SECRET_ACCESS_KEY = 'your_secret_key'
+S3_BUCKET_NAME = 'your_bucket_name'
 
-# Create an S3 client
-s3 = boto3.client(
+# Initialize the S3 client
+s3_client = boto3.client(
     's3',
-    aws_access_key_id=AWS_ACCESS_KEY,
-    aws_secret_access_key=AWS_SECRET_KEY,
-    region_name=S3_REGION_NAME
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
 )
 
 @app.route('/')
@@ -35,82 +24,56 @@ def index():
     return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
-def upload_file():
+def upload():
     if 'file' not in request.files:
         return 'No file part'
     file = request.files['file']
     if file.filename == '':
         return 'No selected file'
     if file:
-        try:
-            # Upload the file to S3
-            s3.upload_fileobj(
-                file,
-                S3_BUCKET_NAME,
-                file.filename,
-                ExtraArgs={'ACL': 'public-read'}  # Make the file publicly accessible
-            )
-            # Get the URL of the uploaded file
-            file_url = f"https://{S3_BUCKET_NAME}.s3.{S3_REGION_NAME}.amazonaws.com/{file.filename}"
-            return redirect(url_for('upload_success', file_url=file_url))
-        except NoCredentialsError:
-            return 'Credentials not available'
-        except Exception as e:
-            return str(e)
+        s3_client.upload_fileobj(file, S3_BUCKET_NAME, file.filename)
+        return 'File uploaded successfully'
 
-@app.route('/upload-success')
-def upload_success():
-    file_url = request.args.get('file_url')
-    return render_template('upload_success.html', file_url=file_url)
+@app.route('/download', methods=['POST'])
+def download():
+    file_key = request.form['file_key']
+    if not file_key:
+        return 'No file key provided'
+    local_filename = os.path.join('/tmp', file_key)
+    s3_client.download_file(S3_BUCKET_NAME, file_key, local_filename)
+    return send_file(local_filename, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
 ```
 
-Create an `index.html` template for the file upload form in a `templates` directory:
+Create an `index.html` file in a `templates` folder with the following content:
 
 ```html
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upload File</title>
-</head>
-<body>
-  <h1>Upload File to S3</h1>
-  <form action="/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="file">
-    <input type="submit" value="Upload">
-  </form>
-</body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Upload and Download to S3</title>
+  </head>
+  <body>
+    <div>
+      <h1>Upload File to S3</h1>
+      <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Upload">
+      </form>
+    </div>
+    <div>
+      <h1>Download File from S3</h1>
+      <form action="/download" method="post">
+        <input type="text" name="file_key" placeholder="Enter the S3 file key">
+        <input type="submit" value="Download">
+      </form>
+    </div>
+  </body>
 </html>
 ```
 
-Create an `upload_success.html` template to display the clickable URL after a successful upload:
-
-```html
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upload Success</title>
-</head>
-<body>
-  <h1>File Uploaded Successfully</h1>
-  <p>Click the link below to view your file:</p>
-  <a href="{{ file_url }}" target="_blank">{{ file_url }}</a>
-</body>
-</html>
-```
-
-Replace `YOUR_AWS_ACCESS_KEY`, `YOUR_AWS_SECRET_KEY`, `YOUR_S3_BUCKET_NAME`, and `YOUR_S3_REGION_NAME` with your actual AWS credentials and S3 bucket details.
-
-Run the Flask application:
-
-```bash
-python app.py
-```
-
-Navigate to `http://127.0.0.1:5000` in your web browser, and you should be able to upload a file and get a clickable link to the uploaded file in your S3 bucket.
+Make sure to replace `'your_access_key'`, `'your_secret_key'`, and `'your_bucket_name'` with your actual AWS credentials and S3 bucket name. This application allows users to upload files to S3 and download files from S3 using simple HTML forms.
