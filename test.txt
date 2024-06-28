@@ -90,3 +90,69 @@ if __name__ == '__main__':
     <a href="{{ file_url }}" target="_blank">View File</a>
   </body>
 </html>
+
+==========================================================================
+
+
+
+from flask import Flask, request, redirect, url_for, render_template_string, send_file
+import boto3
+from werkzeug.utils import secure_filename
+import os
+import io
+
+app = Flask(__name__)
+
+# Configure your S3 bucket and prefix
+S3_BUCKET = 'your-s3-bucket-name'
+S3_PREFIX = 'your/s3/prefix/'
+S3_REGION = 'your-s3-region'
+
+# Initialize S3 client
+s3_client = boto3.client('s3')
+
+# HTML template for the file upload form and display
+html_template = '''
+<!doctype html>
+<html lang="en">
+<head>
+    <title>File Upload</title>
+</head>
+<body>
+    <h1>Upload a File</h1>
+    <form method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" value="Upload">
+    </form>
+    {% if filename %}
+        <h2>Uploaded File</h2>
+        <a href="{{ url_for('download_file', filename=filename) }}" target="_blank">{{ filename }}</a>
+    {% endif %}
+</body>
+</html>
+'''
+
+@app.route('/', methods=['GET', 'POST'])
+def upload_file():
+    filename = None
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            return redirect(request.url)
+        if file:
+            filename = secure_filename(file.filename)
+            file_key = S3_PREFIX + filename
+            s3_client.upload_fileobj(file, S3_BUCKET, file_key)
+    return render_template_string(html_template, filename=filename)
+
+@app.route('/download/<filename>', methods=['GET'])
+def download_file(filename):
+    file_key = S3_PREFIX + filename
+    file_obj = s3_client.get_object(Bucket=S3_BUCKET, Key=file_key)
+    return send_file(io.BytesIO(file_obj['Body'].read()), attachment_filename=filename)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
