@@ -1,158 +1,59 @@
-from flask import Flask, request, redirect, url_for, render_template, send_file
-import boto3
-import os
-from werkzeug.utils import secure_filename
-from botocore.exceptions import NoCredentialsError
+from flask import Flask, render_template_string, session, url_for, make_response, redirect
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key"
 
-# Configuration
-UPLOAD_FOLDER = 'uploads'
-BUCKET_NAME = 'your-s3-bucket-name'  # Replace with your S3 bucket name
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+@app.route("/logout")
+def logout():
+    # Clear the session data
+    session.clear()
+    
+    # Create a response object
+    response = make_response(render_template_string('''
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Logout</title>
+        <script>
+            function clearBrowserData() {
+                // Clear local storage
+                localStorage.clear();
+                
+                // Clear session storage
+                sessionStorage.clear();
+                
+                // Clear cookies
+                var cookies = document.cookie.split(";");
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i];
+                    var eqPos = cookie.indexOf("=");
+                    var name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+                    document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                }
+            }
+            
+            // Execute the function on page load
+            window.onload = clearBrowserData;
+        </script>
+    </head>
+    <body>
+        <p>You are logged out. Please close all browser windows.</p>
+    </body>
+    </html>
+    '''))
+    
+    # Expire the session cookie
+    response.set_cookie('session', '', expires=0)
+    
+    # Add additional cookies to clear if necessary
+    response.set_cookie('another_cookie_name', '', expires=0)
+    
+    return response
 
-# Initialize S3 client
-s3 = boto3.client('s3')
-
-# Ensure the upload directory exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return "You are logged out"
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return "No file part"
-    file = request.files['file']
-    if file.filename == '':
-        return "No selected file"
-    if file:
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-
-        # Upload to S3
-        try:
-            s3.upload_file(file_path, BUCKET_NAME, filename)
-            # Generate URL
-            file_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{filename}"
-            return redirect(url_for('uploaded_file', file_url=file_url))
-        except NoCredentialsError:
-            return "Credentials not available"
-
-@app.route('/uploaded')
-def uploaded_file():
-    file_url = request.args.get('file_url')
-    return render_template('uploaded.html', file_url=file_url)
-
-@app.route('/view')
-def view_file():
-    file_url = request.args.get('file_url')
-    return redirect(file_url, code=302)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
-
-
--------------------------------------------------------------------
-
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Upload File</title>
-  </head>
-  <body>
-    <h1>Upload a File</h1>
-    <form action="/upload" method="post" enctype="multipart/form-data">
-      <input type="file" name="file">
-      <input type="submit" value="Upload">
-    </form>
-  </body>
-</html>
-
-
-=====================================================================
-
-
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>File Uploaded</title>
-  </head>
-  <body>
-    <h1>File Uploaded</h1>
-    <a href="{{ file_url }}" target="_blank">View File</a>
-  </body>
-</html>
-
-==========================================================================
-
-
-
-from flask import Flask, request, redirect, url_for, render_template_string, send_file
-import boto3
-from werkzeug.utils import secure_filename
-import os
-import io
-
-app = Flask(__name__)
-
-# Configure your S3 bucket and prefix
-S3_BUCKET = 'your-s3-bucket-name'
-S3_PREFIX = 'your/s3/prefix/'
-S3_REGION = 'your-s3-region'
-
-# Initialize S3 client
-s3_client = boto3.client('s3')
-
-# HTML template for the file upload form and display
-html_template = '''
-<!doctype html>
-<html lang="en">
-<head>
-    <title>File Upload</title>
-</head>
-<body>
-    <h1>Upload a File</h1>
-    <form method="post" enctype="multipart/form-data">
-        <input type="file" name="file">
-        <input type="submit" value="Upload">
-    </form>
-    {% if filename %}
-        <h2>Uploaded File</h2>
-        <a href="{{ url_for('download_file', filename=filename) }}" target="_blank">{{ filename }}</a>
-    {% endif %}
-</body>
-</html>
-'''
-
-@app.route('/', methods=['GET', 'POST'])
-def upload_file():
-    filename = None
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return redirect(request.url)
-        file = request.files['file']
-        if file.filename == '':
-            return redirect(request.url)
-        if file:
-            filename = secure_filename(file.filename)
-            file_key = S3_PREFIX + filename
-            s3_client.upload_fileobj(file, S3_BUCKET, file_key)
-    return render_template_string(html_template, filename=filename)
-
-@app.route('/download/<filename>', methods=['GET'])
-def download_file(filename):
-    file_key = S3_PREFIX + filename
-    file_obj = s3_client.get_object(Bucket=S3_BUCKET, Key=file_key)
-    return send_file(io.BytesIO(file_obj['Body'].read()), attachment_filename=filename)
-
-if __name__ == '__main__':
-    app.run(debug=True)
-
