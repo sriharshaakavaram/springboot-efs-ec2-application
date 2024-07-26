@@ -1,6 +1,7 @@
 from flask import Flask, redirect, url_for, session, request
 import requests
 from urllib.parse import urlencode
+import logging
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -9,7 +10,7 @@ app.secret_key = 'your_secret_key'
 OP_CONFIG = {
     'authorization_endpoint': 'https://your-op.com/authorize',
     'token_endpoint': 'https://your-op.com/token',
-    'end_session_endpoint': 'https://your-op.com/logout',  # The end_session_endpoint
+    'end_session_endpoint': 'https://your-op.com/logout',
     'client_id': 'your_client_id',
     'client_secret': 'your_client_secret',
     'redirect_uri': 'https://your-app.com/callback',
@@ -33,8 +34,11 @@ def login():
 
 @app.route('/callback')
 def callback():
-    # Exchange the authorization code for a token
     code = request.args.get('code')
+    if not code:
+        logging.error("Authorization code not found in the request")
+        return "Authorization code not found in the request", 400
+    
     token_response = requests.post(OP_CONFIG['token_endpoint'], data={
         'grant_type': 'authorization_code',
         'code': code,
@@ -42,8 +46,18 @@ def callback():
         'client_id': OP_CONFIG['client_id'],
         'client_secret': OP_CONFIG['client_secret']
     })
+    
+    if token_response.status_code != 200:
+        logging.error(f"Token endpoint returned an error: {token_response.json()}")
+        return f"Token endpoint returned an error: {token_response.json()}", 400
+
     token_data = token_response.json()
-    session['id_token'] = token_data['id_token']
+    session['id_token'] = token_data.get('id_token')
+    
+    if 'id_token' not in token_data:
+        logging.error("ID token not found in the token response")
+        return "ID token not found in the token response", 400
+
     return redirect(url_for('home'))
 
 @app.route('/logout')
