@@ -17,6 +17,8 @@ OP_CONFIG = {
     'logout_redirect_uri': 'https://your-app.com/loggedout'
 }
 
+logging.basicConfig(level=logging.DEBUG)
+
 @app.route('/')
 def home():
     return 'Welcome to the Flask OIDC App'
@@ -30,7 +32,9 @@ def login():
         'redirect_uri': OP_CONFIG['redirect_uri'],
         'scope': 'openid email profile'
     }
-    return redirect(f"{authorization_url}?{urlencode(params)}")
+    url = f"{authorization_url}?{urlencode(params)}"
+    logging.debug(f"Authorization URL: {url}")
+    return redirect(url)
 
 @app.route('/callback')
 def callback():
