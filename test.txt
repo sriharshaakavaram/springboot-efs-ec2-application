@@ -1,85 +1,35 @@
-from flask import Flask, redirect, url_for, session, request
-import requests
-from urllib.parse import urlencode
-import logging
+# Use Amazon Linux 2023 as the base image
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023
 
-app = Flask(__name__)
-app.secret_key = 'your_secret_key'
+# Install Node.js and other necessary dependencies
+RUN yum update -y && \
+    yum install -y \
+    gcc-c++ \
+    make \
+    curl \
+    && curl -sL https://rpm.nodesource.com/setup_18.x | bash - && \
+    yum install -y nodejs
 
-# Replace with your OP configuration
-OP_CONFIG = {
-    'authorization_endpoint': 'https://your-op.com/authorize',
-    'token_endpoint': 'https://your-op.com/token',
-    'end_session_endpoint': 'https://your-op.com/logout',
-    'client_id': 'your_client_id',
-    'client_secret': 'your_client_secret',
-    'redirect_uri': 'https://your-app.com/callback',
-    'logout_redirect_uri': 'https://your-app.com/loggedout'
-}
+# Set the working directory
+WORKDIR /app
 
-logging.basicConfig(level=logging.DEBUG)
+# Copy the package.json and package-lock.json files
+COPY package*.json ./
 
-@app.route('/')
-def home():
-    return 'Welcome to the Flask OIDC App'
+# Install the dependencies
+RUN npm install
 
-@app.route('/login')
-def login():
-    authorization_url = OP_CONFIG['authorization_endpoint']
-    params = {
-        'response_type': 'code',
-        'client_id': OP_CONFIG['client_id'],
-        'redirect_uri': OP_CONFIG['redirect_uri'],
-        'scope': 'openid email profile'
-    }
-    url = f"{authorization_url}?{urlencode(params)}"
-    logging.debug(f"Authorization URL: {url}")
-    return redirect(url)
+# Copy the rest of the application files
+COPY . .
 
-@app.route('/callback')
-def callback():
-    code = request.args.get('code')
-    if not code:
-        logging.error("Authorization code not found in the request")
-        return "Authorization code not found in the request", 400
-    
-    try:
-        token_response = requests.post(OP_CONFIG['token_endpoint'], data={
-            'grant_type': 'authorization_code',
-            'code': code,
-            'redirect_uri': OP_CONFIG['redirect_uri'],
-            'client_id': OP_CONFIG['client_id'],
-            'client_secret': OP_CONFIG['client_secret']
-        })
-        token_response.raise_for_status()  # Raise an error for bad status codes
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Token endpoint request failed: {e}")
-        return f"Token endpoint request failed: {e}", 500
-    
-    token_data = token_response.json()
-    session['id_token'] = token_data.get('id_token')
-    
-    if 'id_token' not in token_data:
-        logging.error("ID token not found in the token response")
-        return "ID token not found in the token response", 400
+# Build the React app for production
+RUN npm run build
 
-    return redirect(url_for('home'))
+# Install a simple HTTP server to serve the static files
+RUN npm install -g serve
 
-@app.route('/logout')
-def logout():
-    id_token = session.pop('id_token', None)
-    if id_token and OP_CONFIG.get('end_session_endpoint'):
-        logout_url = OP_CONFIG['end_session_endpoint']
-        params = {
-            'id_token_hint': id_token,
-            'post_logout_redirect_uri': OP_CONFIG['logout_redirect_uri']
-        }
-        return redirect(f"{logout_url}?{urlencode(params)}")
-    return redirect(OP_CONFIG['logout_redirect_uri'])
+# Expose port 3000 to the outside world
+EXPOSE 3000
 
-@app.route('/loggedout')
-def loggedout():
-    return 'You have been logged out.'
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# Command to run the app
+CMD ["serve", "-s", "build", "-l", "3000"]
