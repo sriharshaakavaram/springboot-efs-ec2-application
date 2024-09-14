@@ -1,1 +1,13 @@
-https://github.com/amazonlinux/amazon-linux-2023/issues/690
+import requests
+
+# The service URL
+url = "http://ashescluster-usersrvc-tcp-8080.dpe0260-sbx.sbx6.aws.c.statest.com:8080"
+
+# Making a GET request to the service
+response = requests.get(url)
+
+# Print the response
+if response.status_code == 200:
+    print("Response data:", response.json())
+else:
+    print("Failed to connect. Status code:", response.status_code)
