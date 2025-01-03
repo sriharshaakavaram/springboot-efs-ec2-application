@@ -1,39 +1,61 @@
-#!/bin/bash
+import streamlit as st
+import os
+import subprocess
 
-# Variables
-EFS_MOUNT_POINT="/mnt/efs"  # Adjust this to the EFS mount point
-LOCAL_FILE_PATH="path/to/local/file.txt"  # Full path to the local file
-TARGET_FILE_PATH="$EFS_MOUNT_POINT/target/directory/file.txt"  # Destination in the EFS
+# Set the EFS path (Modify this based on your AWS EFS mount path)
+EFS_PATH = "/mnt/efs"
+FILE_NAME = "efs_test_file.txt"
+FILE_PATH = os.path.join(EFS_PATH, FILE_NAME)
 
-# Function to check if EFS is mounted
-is_efs_mounted() {
-    mount | grep "$EFS_MOUNT_POINT" > /dev/null 2>&1
-    return $?
-}
+st.title("Cross-Platform File Operations on AWS EFS with Command Execution")
 
-# Check if the EFS is mounted
-if is_efs_mounted; then
-    echo "EFS is mounted at $EFS_MOUNT_POINT."
-    
-    # Check if the local file exists
-    if [[ -f "$LOCAL_FILE_PATH" ]]; then
-        echo "Local file $LOCAL_FILE_PATH found."
-        
-        # Create the target directory if it doesn't exist
-        TARGET_DIR=$(dirname "$TARGET_FILE_PATH")
-        mkdir -p "$TARGET_DIR"
-        
-        # Copy the file to the EFS
-        cp "$LOCAL_FILE_PATH" "$TARGET_FILE_PATH"
-        
-        if [[ $? -eq 0 ]]; then
-            echo "File successfully copied to $TARGET_FILE_PATH."
-        else
-            echo "Error copying file to $TARGET_FILE_PATH."
-        fi
-    else
-        echo "Local file $LOCAL_FILE_PATH does not exist."
-    fi
-else
-    echo "EFS is not mounted at $EFS_MOUNT_POINT. Please ensure it is mounted before running this script."
-fi
+# Check if EFS path exists
+if not os.path.exists(EFS_PATH):
+    st.error(f"EFS path '{EFS_PATH}' does not exist! Ensure it is mounted.")
+else:
+    st.success(f"EFS path '{EFS_PATH}' is accessible.")
+
+# Button to Generate a File in EFS
+if st.button("Generate File in EFS"):
+    try:
+        with open(FILE_PATH, "w") as f:
+            f.write("This is a test file stored in AWS EFS.\nWorks across platforms!")
+        st.success(f"File '{FILE_NAME}' created successfully in EFS!")
+    except Exception as e:
+        st.error(f"Error creating file: {e}")
+
+# Button to Read File from EFS
+if st.button("Read File from EFS"):
+    if os.path.exists(FILE_PATH):
+        try:
+            with open(FILE_PATH, "r") as f:
+                content = f.read()
+            st.text_area("File Content:", content, height=150)
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+    else:
+        st.warning(f"File '{FILE_NAME}' does not exist in EFS!")
+
+# Button to Delete File from EFS
+if st.button("Delete File from EFS"):
+    if os.path.exists(FILE_PATH):
+        try:
+            os.remove(FILE_PATH)
+            st.success(f"File '{FILE_NAME}' deleted from EFS!")
+        except Exception as e:
+            st.error(f"Error deleting file: {e}")
+    else:
+        st.warning(f"File '{FILE_NAME}' does not exist in EFS!")
+
+# OS Command Execution
+st.subheader("Execute OS Commands")
+command = st.text_input("Enter your command:")
+if st.button("Run Command"):
+    if command:
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            st.text_area("Command Output:", result.stdout + result.stderr, height=200)
+        except Exception as e:
+            st.error(f"Error executing command: {e}")
+    else:
+        st.warning("Please enter a command.")
