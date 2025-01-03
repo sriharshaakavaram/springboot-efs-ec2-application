@@ -1,13 +1,39 @@
-import requests
+#!/bin/bash
 
-# The service URL
-url = "http://ashescluster-usersrvc-tcp-8080.dpe0260-sbx.sbx6.aws.c.statest.com:8080"
+# Variables
+EFS_MOUNT_POINT="/mnt/efs"  # Adjust this to the EFS mount point
+LOCAL_FILE_PATH="path/to/local/file.txt"  # Full path to the local file
+TARGET_FILE_PATH="$EFS_MOUNT_POINT/target/directory/file.txt"  # Destination in the EFS
 
-# Making a GET request to the service
-response = requests.get(url)
+# Function to check if EFS is mounted
+is_efs_mounted() {
+    mount | grep "$EFS_MOUNT_POINT" > /dev/null 2>&1
+    return $?
+}
 
-# Print the response
-if response.status_code == 200:
-    print("Response data:", response.json())
-else:
-    print("Failed to connect. Status code:", response.status_code)
+# Check if the EFS is mounted
+if is_efs_mounted; then
+    echo "EFS is mounted at $EFS_MOUNT_POINT."
+    
+    # Check if the local file exists
+    if [[ -f "$LOCAL_FILE_PATH" ]]; then
+        echo "Local file $LOCAL_FILE_PATH found."
+        
+        # Create the target directory if it doesn't exist
+        TARGET_DIR=$(dirname "$TARGET_FILE_PATH")
+        mkdir -p "$TARGET_DIR"
+        
+        # Copy the file to the EFS
+        cp "$LOCAL_FILE_PATH" "$TARGET_FILE_PATH"
+        
+        if [[ $? -eq 0 ]]; then
+            echo "File successfully copied to $TARGET_FILE_PATH."
+        else
+            echo "Error copying file to $TARGET_FILE_PATH."
+        fi
+    else
+        echo "Local file $LOCAL_FILE_PATH does not exist."
+    fi
+else
+    echo "EFS is not mounted at $EFS_MOUNT_POINT. Please ensure it is mounted before running this script."
+fi
