@@ -1,24 +1,92 @@
-# Use official Python image
-FROM python:3.9
+import streamlit as st
+import os
+import subprocess
+from threading import Thread
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from streamlit.runtime.scriptrunner import add_script_run_ctx
 
-# Set the working directory
-WORKDIR /app
+# Health Check Server Configuration
+HEALTH_CHECK_PORT = 8000
 
-# Copy the application files
-COPY app.py requirements.txt ./
+# Set the EFS path (Modify this based on your AWS EFS mount path)
+EFS_PATH = "/mnt/efs"
+FILE_NAME = "efs_test_file.txt"
+FILE_PATH = os.path.join(EFS_PATH, FILE_NAME)
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Health Check HTTP Server
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/health":
+            # Respond with 200 OK if the application is running
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+        else:
+            # Return 404 for other endpoints
+            self.send_response(404)
+            self.end_headers()
 
-# Expose port 8080
-EXPOSE 8080
+def run_health_check_server():
+    server = HTTPServer(("0.0.0.0", HEALTH_CHECK_PORT), HealthCheckHandler)
+    print(f"Health check endpoint running on port {HEALTH_CHECK_PORT}")
+    server.serve_forever()
 
-# Set environment variable to avoid Streamlit telemetry
-ENV STREAMLIT_SERVER_HEADLESS true
+# Start the health check server in a separate thread
+health_check_thread = Thread(target=run_health_check_server, daemon=True)
+add_script_run_ctx(health_check_thread)  # Ensure compatibility with Streamlit's runtime
+health_check_thread.start()
 
-# Run the Streamlit application
-CMD ["streamlit", "run", "app.py", "--server.port=8080", "--server.address=0.0.0.0"]
+# Streamlit Application
+st.title("Cross-Platform File Operations on AWS EFS with Command Execution")
 
+# Check if EFS path exists
+if not os.path.exists(EFS_PATH):
+    st.error(f"EFS path '{EFS_PATH}' does not exist! Ensure it is mounted.")
+else:
+    st.success(f"EFS path '{EFS_PATH}' is accessible.")
 
-requirements.txt
-streamlit
+# Button to Generate a File in EFS
+if st.button("Generate File in EFS"):
+    try:
+        with open(FILE_PATH, "w") as f:
+            f.write("This is a test file stored in AWS EFS.\nWorks across platforms!")
+        st.success(f"File '{FILE_NAME}' created successfully in EFS!")
+    except Exception as e:
+        st.error(f"Error creating file: {e}")
+
+# Button to Read File from EFS
+if st.button("Read File from EFS"):
+    if os.path.exists(FILE_PATH):
+        try:
+            with open(FILE_PATH, "r") as f:
+                content = f.read()
+            st.text_area("File Content:", content, height=150)
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+    else:
+        st.warning(f"File '{FILE_NAME}' does not exist in EFS!")
+
+# Button to Delete File from EFS
+if st.button("Delete File from EFS"):
+    if os.path.exists(FILE_PATH):
+        try:
+            os.remove(FILE_PATH)
+            st.success(f"File '{FILE_NAME}' deleted from EFS!")
+        except Exception as e:
+            st.error(f"Error deleting file: {e}")
+    else:
+        st.warning(f"File '{FILE_NAME}' does not exist in EFS!")
+
+# OS Command Execution
+st.subheader("Execute OS Commands")
+command = st.text_input("Enter your command:")
+if st.button("Run Command"):
+    if command:
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+            st.text_area("Command Output:", result.stdout + result.stderr, height=200)
+        except Exception as e:
+            st.error(f"Error executing command: {e}")
+    else:
+        st.warning("Please enter a command.")
