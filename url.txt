@@ -18,3 +18,7 @@ ENV STREAMLIT_SERVER_HEADLESS true
 
 # Run the Streamlit application
 CMD ["streamlit", "run", "app.py", "--server.port=8080", "--server.address=0.0.0.0"]
+
+
+requirements.txt
+streamlit
