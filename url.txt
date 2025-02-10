@@ -2,36 +2,40 @@ import streamlit as st
 import os
 import subprocess
 
-# Streamlit Application Title
-st.title("🔹 AWS EFS File Operations with Dynamic Path Input")
+# Get URL query parameters for health check
+query_params = st.experimental_get_query_params()
 
-# Extract query parameters to check if this is a health check request
-query_params = st.query_params
-
-if "health" in query_params:
-    # Return a simple health check response
+# Check if the request is for health check
+if query_params.get("page") == ["health"]:
     st.write("OK")
 else:
-    # User input for EFS path
-    efs_path = st.text_input("Enter EFS Mount Path:", "/mnt/efs")
+    # Streamlit Application Title
+    st.title("🔹 AWS Storage Operations (EFS / FSx)")
 
-    if os.path.exists(efs_path):
-        st.success(f"✅ EFS path '{efs_path}' is accessible.")
-        
+    # Storage Type Selection (Dropdown)
+    storage_type = st.selectbox("Select Storage Type:", ["EFS", "FSx"])
+
+    # Set default paths based on selection
+    default_paths = {"EFS": "/mnt/efs", "FSx": "/mnt/fsx"}
+    storage_path = st.text_input("Enter Storage Mount Path:", default_paths[storage_type])
+
+    if os.path.exists(storage_path):
+        st.success(f"✅ {storage_type} path '{storage_path}' is accessible.")
+
         # Define file path
-        file_name = "efs_test_file.txt"
-        file_path = os.path.join(efs_path, file_name)
+        file_name = f"{storage_type.lower()}_test_file.txt"
+        file_path = os.path.join(storage_path, file_name)
 
         # File Operations
-        if st.button("Generate File in EFS"):
+        if st.button(f"Generate File in {storage_type}"):
             try:
                 with open(file_path, "w") as f:
-                    f.write("This is a test file stored in AWS EFS.\nWorks across platforms!")
-                st.success(f"✅ File '{file_name}' created successfully in EFS!")
+                    f.write(f"This is a test file stored in AWS {storage_type}.\nWorks across platforms!")
+                st.success(f"✅ File '{file_name}' created successfully in {storage_type}!")
             except Exception as e:
                 st.error(f"❌ Error creating file: {e}")
 
-        if st.button("Read File from EFS"):
+        if st.button(f"Read File from {storage_type}"):
             if os.path.exists(file_path):
                 try:
                     with open(file_path, "r") as f:
@@ -40,20 +44,20 @@ else:
                 except Exception as e:
                     st.error(f"❌ Error reading file: {e}")
             else:
-                st.warning(f"⚠️ File '{file_name}' does not exist in EFS!")
+                st.warning(f"⚠️ File '{file_name}' does not exist in {storage_type}!")
 
-        if st.button("Delete File from EFS"):
+        if st.button(f"Delete File from {storage_type}"):
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
-                    st.success(f"🗑️ File '{file_name}' deleted from EFS!")
+                    st.success(f"🗑️ File '{file_name}' deleted from {storage_type}!")
                 except Exception as e:
                     st.error(f"❌ Error deleting file: {e}")
             else:
-                st.warning(f"⚠️ File '{file_name}' does not exist in EFS!")
+                st.warning(f"⚠️ File '{file_name}' does not exist in {storage_type}!")
 
     else:
-        st.error(f"❌ EFS path '{efs_path}' does not exist! Ensure it is mounted.")
+        st.error(f"❌ {storage_type} path '{storage_path}' does not exist! Ensure it is mounted.")
 
     # OS Command Execution
     st.subheader("⚡ Execute OS Commands")
