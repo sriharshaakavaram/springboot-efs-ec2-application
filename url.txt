@@ -2,8 +2,11 @@ import streamlit as st
 import os
 import subprocess
 
-# Get URL query parameters for health check
-query_params = st.experimental_get_query_params()
+# Get URL query parameters (Future-compatible way)
+try:
+    query_params = st.query_params  # If Streamlit introduces this in future updates
+except AttributeError:
+    query_params = st.experimental_get_query_params()  # Fallback
 
 # Check if the request is for health check
 if query_params.get("page") == ["health"]:
