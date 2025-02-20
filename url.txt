@@ -168,24 +168,35 @@ class StorageController {
 ============================================
 
 
-import "bootstrap/dist/css/bootstrap.min.css";
+import React, { useState } from "react";
+import axios from "axios";
 
-export const metadata = {
-  title: "API Health Check",
-  description: "Monitor the health status of microservices",
+const App = () => {
+  const [response, setResponse] = useState("");
+
+  const checkService = async (service) => {
+    let url = `http://localhost:${service}/actuator/health`;
+
+    try {
+      const res = await axios.get(url);
+      setResponse(`${service}: ${res.data.status}`);
+    } catch (error) {
+      setResponse(`Error connecting to ${service}`);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Microservices Health Check</h1>
+      <button onClick={() => checkService(8080)}>Check Gateway</button>
+      <button onClick={() => checkService(8081)}>Check DataService</button>
+      <button onClick={() => checkService(8082)}>Check StorageService</button>
+      <p>{response}</p>
+    </div>
+  );
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
+export default App;
 
 ======================================================
 
