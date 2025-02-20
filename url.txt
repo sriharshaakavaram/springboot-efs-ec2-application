@@ -1,76 +1,111 @@
-import streamlit as st
-import os
-import subprocess
+package com.example.gateway;
 
-# Get URL query parameters (Future-compatible way)
-try:
-    query_params = st.query_params  # If Streamlit introduces this in future updates
-except AttributeError:
-    query_params = st.experimental_get_query_params()  # Fallback
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
-# Check if the request is for health check
-if query_params.get("page") == ["health"]:
-    st.write("OK")
-else:
-    # Streamlit Application Title
-    st.title("🔹 AWS Storage Operations (EFS / FSx)")
+@SpringBootApplication
+public class GatewayServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(GatewayServiceApplication.class, args);
+    }
+}
 
-    # Storage Type Selection (Dropdown)
-    storage_type = st.selectbox("Select Storage Type:", ["EFS", "FSx"])
+@RestController
+@RequestMapping("/gateway")
+class GatewayController {
 
-    # Set default paths based on selection
-    default_paths = {"EFS": "/mnt/efs", "FSx": "/mnt/fsx"}
-    storage_path = st.text_input("Enter Storage Mount Path:", default_paths[storage_type])
+    private final RestTemplate restTemplate = new RestTemplate();
 
-    if os.path.exists(storage_path):
-        st.success(f"✅ {storage_type} path '{storage_path}' is accessible.")
+    @GetMapping("/connect-data")
+    public String connectToDataService() {
+        String response = restTemplate.getForObject("http://localhost:8082/data/health", String.class);
+        return "Connected to DataService: " + response;
+    }
 
-        # Define file path
-        file_name = f"{storage_type.lower()}_test_file.txt"
-        file_path = os.path.join(storage_path, file_name)
+    @GetMapping("/connect-storage")
+    public String connectToStorageService() {
+        String response = restTemplate.getForObject("http://localhost:8083/storage/health", String.class);
+        return "Connected to StorageService: " + response;
+    }
 
-        # File Operations
-        if st.button(f"Generate File in {storage_type}"):
-            try:
-                with open(file_path, "w") as f:
-                    f.write(f"This is a test file stored in AWS {storage_type}.\nWorks across platforms!")
-                st.success(f"✅ File '{file_name}' created successfully in {storage_type}!")
-            except Exception as e:
-                st.error(f"❌ Error creating file: {e}")
+    @GetMapping("/health")
+    public String healthCheck() {
+        return "GatewayService is up!";
+    }
+}
 
-        if st.button(f"Read File from {storage_type}"):
-            if os.path.exists(file_path):
-                try:
-                    with open(file_path, "r") as f:
-                        content = f.read()
-                    st.text_area("📄 File Content:", content, height=150)
-                except Exception as e:
-                    st.error(f"❌ Error reading file: {e}")
-            else:
-                st.warning(f"⚠️ File '{file_name}' does not exist in {storage_type}!")
 
-        if st.button(f"Delete File from {storage_type}"):
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    st.success(f"🗑️ File '{file_name}' deleted from {storage_type}!")
-                except Exception as e:
-                    st.error(f"❌ Error deleting file: {e}")
-            else:
-                st.warning(f"⚠️ File '{file_name}' does not exist in {storage_type}!")
 
-    else:
-        st.error(f"❌ {storage_type} path '{storage_path}' does not exist! Ensure it is mounted.")
+===========================================================================
 
-    # OS Command Execution
-    st.subheader("⚡ Execute OS Commands")
-    command = st.text_input("Enter your command:")
-    if st.button("Run Command"):
-        if command:
-            try:
-                result = subprocess.run(command, shell=True, capture_output=True, text=True)
-                st.text_area("🖥️ Command Output:", result.stdout + result.stderr, height=200)
-            except Exception as e:
-                st.error(f"❌ Error executing command: {e}")
-        else:
-            st.warning("⚠️ Please enter a command.")
+
+package com.example.data;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+
+@SpringBootApplication
+public class DataServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DataServiceApplication.class, args);
+    }
+}
+
+@RestController
+@RequestMapping("/data")
+class DataController {
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @GetMapping("/connect-storage")
+    public String connectToStorageService() {
+        String response = restTemplate.getForObject("http://localhost:8083/storage/health", String.class);
+        return "Connected to StorageService: " + response;
+    }
+
+    @GetMapping("/health")
+    public String healthCheck() {
+        return "DataService is up!";
+    }
+}
+
+
+
+================================================================================
+
+
+package com.example.storage;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@SpringBootApplication
+public class StorageServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(StorageServiceApplication.class, args);
+    }
+}
+
+@RestController
+@RequestMapping("/storage")
+class StorageController {
+
+    @GetMapping("/health")
+    public String healthCheck() {
+        return "StorageService is up!";
+    }
+}
+
+
+
