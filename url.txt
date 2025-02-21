@@ -262,3 +262,72 @@ public class CorsConfig {
         };
     }
 }
+
+======================================================
+# Use OpenJDK 17 as base image
+FROM openjdk:17
+WORKDIR /app
+COPY target/*.jar app.jar
+EXPOSE 8080
+CMD ["java", "-jar", "app.jar"]
+======================================================
+# Use Node.js for building the React app
+FROM node:18 as build-stage
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Use Nginx to serve the frontend
+FROM nginx:alpine
+COPY --from=build-stage /app/build /usr/share/nginx/html
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]
+======================================================
+
+version: "3.8"
+
+services:
+  gateway-service:
+    build: ./gateway-service
+    container_name: gateway-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+    networks:
+      - microservices-net
+    depends_on:
+      - data-service
+      - storage-service
+
+  data-service:
+    build: ./data-service
+    container_name: data-service
+    environment:
+      - SERVER_PORT=8081
+    networks:
+      - microservices-net
+
+  storage-service:
+    build: ./storage-service
+    container_name: storage-service
+    environment:
+      - SERVER_PORT=8082
+    networks:
+      - microservices-net
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - gateway-service
+    networks:
+      - microservices-net
+
+networks:
+  microservices-net:
+    driver: bridge
