@@ -200,71 +200,65 @@ export default App;
 
 ======================================================
 
-"use client"; // This is needed for client-side fetching
-
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
 import axios from "axios";
-import { Container, Table } from "react-bootstrap";
 
-export default function Home() {
-  const [status, setStatus] = useState({
-    gateway: "Checking...",
-    data: "Checking...",
-    storage: "Checking...",
-  });
+const ServiceConnection = () => {
+  const [response, setResponse] = useState("");
 
-  useEffect(() => {
-    const fetchHealthStatus = async () => {
-      try {
-        const [gatewayRes, dataRes, storageRes] = await Promise.all([
-          axios.get("http://localhost:8081/gateway/health"),
-          axios.get("http://localhost:8082/data/health"),
-          axios.get("http://localhost:8083/storage/health"),
-        ]);
+  // Get API URLs from environment variables
+  const gatewayServiceUrl = process.env.REACT_APP_GATEWAY_SERVICE_URL;
+  const dataServiceUrl = process.env.REACT_APP_DATA_SERVICE_URL;
+  const storageServiceUrl = process.env.REACT_APP_STORAGE_SERVICE_URL;
 
-        setStatus({
-          gateway: gatewayRes.data,
-          data: dataRes.data,
-          storage: storageRes.data,
-        });
-      } catch (error) {
-        console.error("Error fetching health checks", error);
-        setStatus({
-          gateway: "Error",
-          data: "Error",
-          storage: "Error",
-        });
-      }
-    };
+  const checkService = async (service) => {
+    let url = "";
+    if (service === "gateway") url = `${gatewayServiceUrl}/actuator/health`;
+    else if (service === "data") url = `${dataServiceUrl}/actuator/health`;
+    else if (service === "storage") url = `${storageServiceUrl}/actuator/health`;
 
-    fetchHealthStatus();
-  }, []);
+    try {
+      const res = await axios.get(url);
+      setResponse(`${service} response: ${res.data.status}`);
+    } catch (error) {
+      setResponse(`Error connecting to ${service}`);
+    }
+  };
 
   return (
-    <Container className="mt-4">
-      <h1>API Health Status</h1>
-      <Table striped bordered hover className="mt-3">
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>GatewayService</td>
-            <td>{status.gateway}</td>
-          </tr>
-          <tr>
-            <td>DataService</td>
-            <td>{status.data}</td>
-          </tr>
-          <tr>
-            <td>StorageService</td>
-            <td>{status.storage}</td>
-          </tr>
-        </tbody>
-      </Table>
-    </Container>
+    <div>
+      <h1>Microservices Health Check</h1>
+      <button onClick={() => checkService("gateway")}>Check Gateway</button>
+      <button onClick={() => checkService("data")}>Check DataService</button>
+      <button onClick={() => checkService("storage")}>Check StorageService</button>
+      <p>{response}</p>
+    </div>
   );
+};
+
+export default ServiceConnection;
+
+======================================================
+
+package com.example.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class CorsConfig {
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOrigins("*") // Allow all origins (Change this in production)
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedHeaders("*");
+            }
+        };
+    }
 }
