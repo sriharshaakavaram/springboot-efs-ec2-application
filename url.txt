@@ -331,3 +331,25 @@ services:
 networks:
   microservices-net:
     driver: bridge
+
+
+----------------------------------------------------------------
+
+# Use Amazon Linux 2023 as the base image
+FROM amazonlinux:2023
+
+# Set working directory
+WORKDIR /app
+
+# Install Java 17
+RUN dnf update -y && \
+    dnf install java-17-amazon-corretto -y
+
+# Copy JAR file to container
+COPY target/*.jar app.jar
+
+# Expose application port
+EXPOSE 8080
+
+# Run the application
+CMD ["java", "-jar", "app.jar"]
