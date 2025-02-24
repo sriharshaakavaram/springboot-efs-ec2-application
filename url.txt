@@ -353,3 +353,52 @@ EXPOSE 8080
 
 # Run the application
 CMD ["java", "-jar", "app.jar"]
+=============================================
+
+import React from 'react';
+import ServiceConnection from './components/ServiceConnection';
+
+function App() {
+  return (
+    <div>
+      <h1>Microservices Connectivity</h1>
+      <ServiceConnection />
+    </div>
+  );
+}
+
+export default App;
+
+===============================================================
+
+import React, { useState } from "react";
+import axios from "axios";
+
+const ServiceConnection = () => {
+  const [response, setResponse] = useState("");
+
+  const checkService = async (service) => {
+    let url = "";
+    if (service === "gateway") url = "http://localhost:8080/gateway/health";
+    else if (service === "data") url = "http://localhost:8081/data/health";
+    else if (service === "storage") url = "http://localhost:8082/storage/health";
+
+    try {
+      const res = await axios.get(url);
+      setResponse(res.data);
+    } catch (error) {
+      setResponse("Error connecting to " + service);
+    }
+  };
+
+  return (
+    <div>
+      <button onClick={() => checkService("gateway")}>Check Gateway</button>
+      <button onClick={() => checkService("data")}>Check DataService</button>
+      <button onClick={() => checkService("storage")}>Check StorageService</button>
+      <p>{response}</p>
+    </div>
+  );
+};
+
+export default ServiceConnection;
