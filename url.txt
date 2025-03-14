@@ -411,3 +411,63 @@ curl -X POST "https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token" \
      -d "client_secret={YOUR_CLIENT_SECRET}" \
      -d "scope=https://graph.microsoft.com/.default" \
      -d "grant_type=client_credentials"
+================================================================
+
+import streamlit as st
+import boto3
+import os
+
+# AWS SQS Configuration
+AWS_REGION = "us-east-1"  # Change to your AWS region
+QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/your-account-id/your-queue-name"
+
+# Initialize SQS Client
+sqs_client = boto3.client(
+    "sqs",
+    region_name=AWS_REGION,
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+)
+
+# Streamlit UI
+st.title("AWS SQS Functionality Test")
+
+# Send Message to SQS
+st.header("Send a Message to SQS")
+message_input = st.text_area("Enter message to send")
+
+if st.button("Send Message"):
+    if message_input:
+        response = sqs_client.send_message(
+            QueueUrl=QUEUE_URL,
+            MessageBody=message_input
+        )
+        st.success(f"Message sent! Message ID: {response['MessageId']}")
+    else:
+        st.error("Message cannot be empty.")
+
+# Receive Messages from SQS
+st.header("Receive Messages from SQS")
+
+if st.button("Receive Message"):
+    response = sqs_client.receive_message(
+        QueueUrl=QUEUE_URL,
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=5
+    )
+
+    messages = response.get("Messages", [])
+    
+    if messages:
+        for msg in messages:
+            st.write(f"Message ID: {msg['MessageId']}")
+            st.write(f"Message Body: {msg['Body']}")
+
+            # Delete the message after reading to avoid duplicate processing
+            sqs_client.delete_message(
+                QueueUrl=QUEUE_URL,
+                ReceiptHandle=msg["ReceiptHandle"]
+            )
+            st.success("Message processed and deleted!")
+    else:
+        st.warning("No messages available in the queue.")
