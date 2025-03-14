@@ -1,0 +1,66 @@
+import json
+import os
+import boto3
+
+def lambda_handler(event, context):
+    """
+    AWS Lambda function to perform operations on EFS or FSx storage.
+    """
+    # Parse input parameters
+    try:
+        body = json.loads(event.get('body', '{}'))
+        storage_type = body.get("storage_type", "EFS")  # Default to EFS
+        command = body.get("command", None)
+    except json.JSONDecodeError:
+        return {"statusCode": 400, "body": json.dumps({"error": "Invalid JSON input"})}
+
+    # Define storage paths
+    default_paths = {"EFS": "/mnt/efs", "FSx": "/mnt/fsx"}
+    storage_path = default_paths.get(storage_type, "/mnt/efs")
+    
+    if not os.path.exists(storage_path):
+        return {"statusCode": 400, "body": json.dumps({"error": f"Storage path {storage_path} does not exist!"})}
+    
+    # Define file path
+    file_name = f"{storage_type}_test_file.txt"
+    file_path = os.path.join(storage_path, file_name)
+
+    action = body.get("action")
+
+    try:
+        if action == "generate":
+            with open(file_path, "w") as f:
+                f.write(f"This is a test file stored in AWS {storage_type}.\nWorks across platforms!")
+            return {"statusCode": 200, "body": json.dumps({"message": f"File '{file_name}' created successfully!"})}
+
+        elif action == "read":
+            if os.path.exists(file_path):
+                with open(file_path, "r") as f:
+                    content = f.read()
+                return {"statusCode": 200, "body": json.dumps({"file_content": content})}
+            else:
+                return {"statusCode": 404, "body": json.dumps({"error": f"File '{file_name}' not found!"})}
+
+        elif action == "delete":
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                return {"statusCode": 200, "body": json.dumps({"message": f"File '{file_name}' deleted!"})}
+            else:
+                return {"statusCode": 404, "body": json.dumps({"error": f"File '{file_name}' not found!"})}
+
+        elif action == "execute_command":
+            if command:
+                import subprocess
+                result = subprocess.run(command, shell=True, capture_output=True, text=True)
+                return {
+                    "statusCode": 200,
+                    "body": json.dumps({"output": result.stdout, "error": result.stderr})
+                }
+            else:
+                return {"statusCode": 400, "body": json.dumps({"error": "No command provided!"})}
+
+        else:
+            return {"statusCode": 400, "body": json.dumps({"error": "Invalid action provided!"})}
+
+    except Exception as e:
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
