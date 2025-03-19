@@ -33,3 +33,151 @@ EXPOSE 3000
 
 # Command to run the app
 CMD ["serve", "-s", "build", "-l", "3000"]
+
+
+-----------------------------------------------------------------------------------------------
+
+
+import streamlit as st
+import boto3
+import json
+import os
+
+# Set AWS region
+AWS_REGION = "us-east-1"
+
+# Initialize AWS clients
+sns_client = boto3.client("sns", region_name=AWS_REGION)
+sqs_client = boto3.client("sqs", region_name=AWS_REGION)
+lambda_client = boto3.client("lambda", region_name=AWS_REGION)
+s3_client = boto3.client("s3", region_name=AWS_REGION)
+
+st.title("AWS Service Tester - SNS, SQS, Lambda, S3")
+
+# ---------------- SNS ----------------
+st.header("Amazon SNS - Publish Message")
+sns_topic_arn = st.text_input("SNS Topic ARN", "")
+sns_message = st.text_area("Message to Publish", "")
+
+if st.button("Publish to SNS"):
+    if sns_topic_arn and sns_message:
+        response = sns_client.publish(TopicArn=sns_topic_arn, Message=sns_message)
+        st.success(f"Message Published! Message ID: {response['MessageId']}")
+    else:
+        st.warning("Please provide both SNS Topic ARN and a message.")
+
+# ---------------- SQS ----------------
+st.header("Amazon SQS - Send & Receive Message")
+sqs_queue_url = st.text_input("SQS Queue URL", "")
+sqs_message = st.text_area("Message to Send to SQS", "")
+
+if st.button("Send to SQS"):
+    if sqs_queue_url and sqs_message:
+        response = sqs_client.send_message(QueueUrl=sqs_queue_url, MessageBody=sqs_message)
+        st.success(f"Message Sent! Message ID: {response['MessageId']}")
+    else:
+        st.warning("Please provide both SQS Queue URL and a message.")
+
+if st.button("Receive from SQS"):
+    if sqs_queue_url:
+        response = sqs_client.receive_message(QueueUrl=sqs_queue_url, MaxNumberOfMessages=1)
+        if "Messages" in response:
+            message = response["Messages"][0]
+            st.write(f"Received Message: {message['Body']}")
+            # Delete message after reading
+            sqs_client.delete_message(QueueUrl=sqs_queue_url, ReceiptHandle=message["ReceiptHandle"])
+            st.success("Message Deleted from SQS")
+        else:
+            st.warning("No messages in the queue.")
+    else:
+        st.warning("Please provide the SQS Queue URL.")
+
+# ---------------- Lambda ----------------
+st.header("AWS Lambda - Invoke Function")
+lambda_function_name = st.text_input("Lambda Function Name", "")
+lambda_payload = st.text_area("JSON Payload", "{}")
+
+if st.button("Invoke Lambda"):
+    if lambda_function_name:
+        try:
+            payload_dict = json.loads(lambda_payload)
+            response = lambda_client.invoke(
+                FunctionName=lambda_function_name,
+                InvocationType="RequestResponse",
+                Payload=json.dumps(payload_dict),
+            )
+            response_payload = response["Payload"].read().decode("utf-8")
+            st.json(json.loads(response_payload))
+        except json.JSONDecodeError:
+            st.error("Invalid JSON payload")
+    else:
+        st.warning("Please provide the Lambda function name.")
+
+# ---------------- S3 ----------------
+st.header("Amazon S3 - Upload & List Objects")
+s3_bucket_name = st.text_input("S3 Bucket Name", "")
+
+uploaded_file = st.file_uploader("Choose a file to upload", type=["txt", "png", "jpg", "csv", "json"])
+
+if st.button("Upload to S3"):
+    if s3_bucket_name and uploaded_file:
+        s3_client.upload_fileobj(uploaded_file, s3_bucket_name, uploaded_file.name)
+        st.success(f"File '{uploaded_file.name}' uploaded successfully to {s3_bucket_name}.")
+    else:
+        st.warning("Please provide an S3 bucket name and upload a file.")
+
+if st.button("List S3 Objects"):
+    if s3_bucket_name:
+        response = s3_client.list_objects_v2(Bucket=s3_bucket_name)
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                st.write(obj["Key"])
+        else:
+            st.warning("No objects found in the bucket.")
+    else:
+        st.warning("Please provide an S3 bucket name.")
+
+# ---------------- Combined Workflow ----------------
+st.header("Combined AWS Workflow")
+
+combined_topic_arn = st.text_input("SNS Topic ARN for Combined Workflow", "")
+combined_sqs_url = st.text_input("SQS Queue URL for Combined Workflow", "")
+combined_lambda_name = st.text_input("Lambda Function Name for Combined Workflow", "")
+combined_s3_bucket = st.text_input("S3 Bucket Name for Combined Workflow", "")
+combined_message = st.text_area("Message for SNS", "")
+
+if st.button("Execute Combined Workflow"):
+    if all([combined_topic_arn, combined_sqs_url, combined_lambda_name, combined_s3_bucket, combined_message]):
+        # Publish message to SNS
+        sns_response = sns_client.publish(TopicArn=combined_topic_arn, Message=combined_message)
+        st.success(f"Message Published to SNS: {sns_response['MessageId']}")
+
+        # Receive message from SQS
+        sqs_response = sqs_client.receive_message(QueueUrl=combined_sqs_url, MaxNumberOfMessages=1)
+        if "Messages" in sqs_response:
+            message = sqs_response["Messages"][0]["Body"]
+            st.success(f"Message received from SQS: {message}")
+
+            # Invoke Lambda function
+            lambda_response = lambda_client.invoke(
+                FunctionName=combined_lambda_name,
+                InvocationType="RequestResponse",
+                Payload=json.dumps({"message": message}),
+            )
+            lambda_output = lambda_response["Payload"].read().decode("utf-8")
+            st.success(f"Lambda Function Output: {lambda_output}")
+
+            # Store result in S3
+            s3_client.put_object(Bucket=combined_s3_bucket, Key="lambda_output.json", Body=lambda_output)
+            st.success(f"Lambda output stored in S3: lambda_output.json")
+
+            # Delete processed message from SQS
+            sqs_client.delete_message(QueueUrl=combined_sqs_url, ReceiptHandle=sqs_response["Messages"][0]["ReceiptHandle"])
+            st.success("Message deleted from SQS.")
+
+        else:
+            st.warning("No messages in the queue.")
+    else:
+        st.warning("Please provide all required AWS resources.")
+
+st.write("Built with ❤️ using Streamlit and AWS SDK (Boto3)")
