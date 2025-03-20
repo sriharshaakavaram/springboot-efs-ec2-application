@@ -188,7 +188,7 @@ import streamlit as st
 import boto3
 import os
 
-# AWS configuration - make sure your credentials are set via environment variables or ~/.aws/credentials
+# AWS configuration - ensure your credentials are set via environment variables or ~/.aws/credentials
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
@@ -203,9 +203,10 @@ s3_client = boto3.client(
 
 def list_s3_objects(bucket, prefix=""):
     """
-    Lists S3 objects in the given bucket and prefix using Delimiter to simulate folder structure.
-    Returns a tuple (directories, files) where directories is a list of dicts from CommonPrefixes,
-    and files is a list of dicts from Contents.
+    List objects in the given bucket and prefix.
+    Returns a tuple (directories, files) where:
+      - directories: list of sub-folder dictionaries from CommonPrefixes.
+      - files: list of file dictionaries from Contents.
     """
     response = s3_client.list_objects_v2(
         Bucket=bucket,
@@ -218,44 +219,45 @@ def list_s3_objects(bucket, prefix=""):
 
 st.title("S3 Bucket File Explorer")
 
-# Bucket input
+# Input for bucket name
 bucket_name = st.text_input("Enter S3 Bucket Name", "")
 
 if bucket_name:
-    # Use Streamlit session state to keep track of the current folder (prefix)
+    # Initialize the current prefix (folder path) in session state
     if "current_prefix" not in st.session_state:
-        st.session_state.current_prefix = ""
-
-    current_prefix = st.session_state.current_prefix
+        st.session_state["current_prefix"] = ""
+    
+    current_prefix = st.session_state["current_prefix"]
     st.write(f"**Current folder:** /{current_prefix}")
 
-    # Back navigation if not in the root folder
+    # Navigation: go back (if not in the root folder)
     if current_prefix:
         if st.button("⬅️ Go Back"):
-            # Remove the last folder from the current prefix
+            # Remove the last folder segment from the prefix
             prefix_parts = current_prefix.rstrip('/').split('/')
             prefix_parts = prefix_parts[:-1]
-            st.session_state.current_prefix = "" if not prefix_parts else "/".join(prefix_parts) + "/"
-            st.experimental_rerun()
+            st.session_state["current_prefix"] = "" if not prefix_parts else "/".join(prefix_parts) + "/"
+            # No need to force a re-run; the script re-runs on every widget interaction.
 
     # List sub-folders and files in the current folder
     try:
         directories, files = list_s3_objects(bucket_name, current_prefix)
-
+        
         st.subheader("📁 Folders")
         if directories:
             for d in directories:
                 folder_full = d.get("Prefix")
-                # Display folder name without the current prefix
+                # Display folder name relative to the current prefix
                 display_folder = folder_full.replace(current_prefix, "")
+                # When the button is clicked, update the current_prefix to this folder's path.
                 if st.button(f"📂 Open {display_folder}", key=folder_full):
-                    st.session_state.current_prefix = folder_full
-                    st.experimental_rerun()
+                    st.session_state["current_prefix"] = folder_full
+                    # The script will re-run on the next interaction, showing the updated folder.
         else:
             st.info("No sub-folders found.")
-
+        
         st.subheader("📄 Files")
-        # Filter out any key that exactly matches the prefix (if present)
+        # Exclude any key that exactly matches the current prefix
         file_list = [f["Key"] for f in files if f["Key"] != current_prefix]
         if file_list:
             selected_file = st.selectbox("Select a file", file_list, key="file_select")
@@ -268,11 +270,11 @@ if bucket_name:
     except Exception as e:
         st.error(f"Error: {e}")
 
-    # Upload section: Uploads to the current folder (prefix)
     st.subheader("📤 Upload File")
     uploaded_file = st.file_uploader("Choose a file", type=["png", "jpg", "csv", "txt", "pdf", "json"])
     if uploaded_file and st.button("⬆️ Upload File"):
-        key = current_prefix + uploaded_file.name  # Upload into current folder
+        # Upload into the current folder
+        key = current_prefix + uploaded_file.name
         s3_client.upload_fileobj(uploaded_file, bucket_name, key)
         st.success(f"Uploaded {uploaded_file.name} to /{current_prefix}")
 
