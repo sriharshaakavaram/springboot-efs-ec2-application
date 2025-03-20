@@ -181,3 +181,67 @@ if st.button("Execute Combined Workflow"):
         st.warning("Please provide all required AWS resources.")
 
 st.write("Built with ❤️ using Streamlit and AWS SDK (Boto3)")
+
+============================================================================================
+
+import streamlit as st
+import boto3
+import os
+
+# AWS Credentials - Ensure they are set in environment variables or ~/.aws/credentials
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = "us-east-1"  # Change this to your region
+
+# Initialize S3 Client
+s3_client = boto3.client(
+    "s3",
+    aws_access_key_id=AWS_ACCESS_KEY,
+    aws_secret_access_key=AWS_SECRET_KEY,
+    region_name=AWS_REGION,
+)
+
+# Streamlit UI
+st.title("S3 Bucket Manager")
+
+# Input Bucket Name
+bucket_name = st.text_input("Enter S3 Bucket Name", "")
+
+if bucket_name:
+    # List files in the bucket
+    st.subheader("Browse Files in S3 Bucket")
+    
+    try:
+        objects = s3_client.list_objects_v2(Bucket=bucket_name)
+        if "Contents" in objects:
+            file_list = [obj["Key"] for obj in objects["Contents"]]
+            selected_file = st.selectbox("Select a file to delete", file_list)
+
+            # Delete file button
+            if st.button("Delete File"):
+                s3_client.delete_object(Bucket=bucket_name, Key=selected_file)
+                st.success(f"Deleted {selected_file} from {bucket_name}")
+
+            # Download selected file
+            if st.button("Download File"):
+                with open(selected_file, "wb") as f:
+                    s3_client.download_fileobj(bucket_name, selected_file, f)
+                st.success(f"Downloaded {selected_file}")
+
+        else:
+            st.warning("No files found in the bucket.")
+
+    except Exception as e:
+        st.error(f"Error: {e}")
+
+    # Upload file section
+    st.subheader("Upload File to S3")
+    uploaded_file = st.file_uploader("Choose a file to upload", type=["png", "jpg", "csv", "txt", "pdf"])
+
+    if uploaded_file:
+        if st.button("Upload File"):
+            s3_client.upload_fileobj(uploaded_file, bucket_name, uploaded_file.name)
+            st.success(f"Uploaded {uploaded_file.name} to {bucket_name}")
+
+else:
+    st.warning("Please enter a bucket name to proceed.")
