@@ -188,10 +188,10 @@ import streamlit as st
 import boto3
 import os
 
-# AWS Credentials - Ensure they are set in environment variables or ~/.aws/credentials
+# AWS configuration - make sure your credentials are set via environment variables or ~/.aws/credentials
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION = "us-east-1"  # Change this to your region
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 # Initialize S3 Client
 s3_client = boto3.client(
@@ -201,47 +201,80 @@ s3_client = boto3.client(
     region_name=AWS_REGION,
 )
 
-# Streamlit UI
-st.title("S3 Bucket Manager")
+def list_s3_objects(bucket, prefix=""):
+    """
+    Lists S3 objects in the given bucket and prefix using Delimiter to simulate folder structure.
+    Returns a tuple (directories, files) where directories is a list of dicts from CommonPrefixes,
+    and files is a list of dicts from Contents.
+    """
+    response = s3_client.list_objects_v2(
+        Bucket=bucket,
+        Prefix=prefix,
+        Delimiter='/'
+    )
+    directories = response.get('CommonPrefixes', [])
+    files = response.get('Contents', [])
+    return directories, files
 
-# Input Bucket Name
+st.title("S3 Bucket File Explorer")
+
+# Bucket input
 bucket_name = st.text_input("Enter S3 Bucket Name", "")
 
 if bucket_name:
-    # List files in the bucket
-    st.subheader("Browse Files in S3 Bucket")
-    
+    # Use Streamlit session state to keep track of the current folder (prefix)
+    if "current_prefix" not in st.session_state:
+        st.session_state.current_prefix = ""
+
+    current_prefix = st.session_state.current_prefix
+    st.write(f"**Current folder:** /{current_prefix}")
+
+    # Back navigation if not in the root folder
+    if current_prefix:
+        if st.button("⬅️ Go Back"):
+            # Remove the last folder from the current prefix
+            prefix_parts = current_prefix.rstrip('/').split('/')
+            prefix_parts = prefix_parts[:-1]
+            st.session_state.current_prefix = "" if not prefix_parts else "/".join(prefix_parts) + "/"
+            st.experimental_rerun()
+
+    # List sub-folders and files in the current folder
     try:
-        objects = s3_client.list_objects_v2(Bucket=bucket_name)
-        if "Contents" in objects:
-            file_list = [obj["Key"] for obj in objects["Contents"]]
-            selected_file = st.selectbox("Select a file to delete", file_list)
+        directories, files = list_s3_objects(bucket_name, current_prefix)
 
-            # Delete file button
-            if st.button("Delete File"):
-                s3_client.delete_object(Bucket=bucket_name, Key=selected_file)
-                st.success(f"Deleted {selected_file} from {bucket_name}")
-
-            # Download selected file
-            if st.button("Download File"):
-                with open(selected_file, "wb") as f:
-                    s3_client.download_fileobj(bucket_name, selected_file, f)
-                st.success(f"Downloaded {selected_file}")
-
+        st.subheader("📁 Folders")
+        if directories:
+            for d in directories:
+                folder_full = d.get("Prefix")
+                # Display folder name without the current prefix
+                display_folder = folder_full.replace(current_prefix, "")
+                if st.button(f"📂 Open {display_folder}", key=folder_full):
+                    st.session_state.current_prefix = folder_full
+                    st.experimental_rerun()
         else:
-            st.warning("No files found in the bucket.")
+            st.info("No sub-folders found.")
+
+        st.subheader("📄 Files")
+        # Filter out any key that exactly matches the prefix (if present)
+        file_list = [f["Key"] for f in files if f["Key"] != current_prefix]
+        if file_list:
+            selected_file = st.selectbox("Select a file", file_list, key="file_select")
+            if st.button("🗑️ Delete File"):
+                s3_client.delete_object(Bucket=bucket_name, Key=selected_file)
+                st.success(f"Deleted {selected_file}")
+        else:
+            st.info("No files in this folder.")
 
     except Exception as e:
         st.error(f"Error: {e}")
 
-    # Upload file section
-    st.subheader("Upload File to S3")
-    uploaded_file = st.file_uploader("Choose a file to upload", type=["png", "jpg", "csv", "txt", "pdf"])
-
-    if uploaded_file:
-        if st.button("Upload File"):
-            s3_client.upload_fileobj(uploaded_file, bucket_name, uploaded_file.name)
-            st.success(f"Uploaded {uploaded_file.name} to {bucket_name}")
+    # Upload section: Uploads to the current folder (prefix)
+    st.subheader("📤 Upload File")
+    uploaded_file = st.file_uploader("Choose a file", type=["png", "jpg", "csv", "txt", "pdf", "json"])
+    if uploaded_file and st.button("⬆️ Upload File"):
+        key = current_prefix + uploaded_file.name  # Upload into current folder
+        s3_client.upload_fileobj(uploaded_file, bucket_name, key)
+        st.success(f"Uploaded {uploaded_file.name} to /{current_prefix}")
 
 else:
     st.warning("Please enter a bucket name to proceed.")
