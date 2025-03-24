@@ -280,3 +280,100 @@ if bucket_name:
 
 else:
     st.warning("Please enter a bucket name to proceed.")
+====================================================================================
+
+
+import streamlit as st
+import boto3
+from botocore.credentials import RefreshableCredentials
+from botocore.session import get_session
+import datetime
+import subprocess
+import json
+import os
+
+# === CONFIGURATION ===
+TRUST_ANCHOR_ARN = "arn:aws:rolesanywhere:us-east-1:123456789012:trust-anchor/abcd1234"
+PROFILE_ARN = "arn:aws:rolesanywhere:us-east-1:123456789012:profile/efgh5678"
+ROLE_ARN = "arn:aws:iam::123456789012:role/MySQSRole"
+CERTIFICATE_PATH = "certs/certificate.pem"
+PRIVATE_KEY_PATH = "certs/private-key.pem"
+SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+
+# === Function to get temporary credentials using Roles Anywhere ===
+def get_temp_creds():
+    session = boto3.Session()
+
+    client = session.client("rolesanywhere", region_name="us-east-1")
+
+    response = client.create_session(
+        profileArn=PROFILE_ARN,
+        roleArn=ROLE_ARN,
+        trustAnchorArn=TRUST_ANCHOR_ARN,
+        durationSeconds=3600,
+        credentialSource={
+            "x509CertificateData": open(CERTIFICATE_PATH).read(),
+            "privateKeyData": open(PRIVATE_KEY_PATH).read()
+        }
+    )
+
+    credentials = response["credentialSet"][0]["credentials"]
+    return {
+        "access_key": credentials["accessKeyId"],
+        "secret_key": credentials["secretAccessKey"],
+        "session_token": credentials["sessionToken"],
+    }
+
+# === Create an SQS client with temporary creds ===
+@st.cache_resource
+def create_sqs_client():
+    creds = get_temp_creds()
+    session = boto3.Session(
+        aws_access_key_id=creds["access_key"],
+        aws_secret_access_key=creds["secret_key"],
+        aws_session_token=creds["session_token"],
+        region_name="us-east-1"
+    )
+    return session.client("sqs")
+
+# === Streamlit UI ===
+st.title("📬 AWS SQS Streamlit App with IAM Roles Anywhere")
+
+client = create_sqs_client()
+
+action = st.radio("Choose action:", ["Send Message", "Receive Message", "Purge Queue"])
+
+if action == "Send Message":
+    msg = st.text_area("Enter message to send:")
+    if st.button("Send"):
+        if msg:
+            response = client.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=msg)
+            st.success(f"Message sent! Message ID: {response['MessageId']}")
+        else:
+            st.warning("Message cannot be empty.")
+
+elif action == "Receive Message":
+    if st.button("Receive"):
+        response = client.receive_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=2
+        )
+        messages = response.get("Messages", [])
+        if messages:
+            msg = messages[0]
+            st.write("📨 Message Received:")
+            st.json(msg)
+            if st.button("Delete Message"):
+                client.delete_message(
+                    QueueUrl=SQS_QUEUE_URL,
+                    ReceiptHandle=msg["ReceiptHandle"]
+                )
+                st.success("Message deleted!")
+        else:
+            st.info("No messages available.")
+
+elif action == "Purge Queue":
+    if st.button("Purge Queue (Caution!)"):
+        client.purge_queue(QueueUrl=SQS_QUEUE_URL)
+        st.success("Queue purged!")
