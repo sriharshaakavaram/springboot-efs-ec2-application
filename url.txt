@@ -471,3 +471,16 @@ if st.button("Receive Message"):
             st.success("Message processed and deleted!")
     else:
         st.warning("No messages available in the queue.")
+
+=======================================================
+
+Dear [Name],
+
+It’s truly bittersweet to say goodbye. Working with you has been an incredible experience—your guidance, support, and leadership have left a lasting impact on me, both professionally and personally. You’ve not only led with integrity and vision but also with kindness and approachability that made it easy to learn and grow under your wing.
+
+Your presence will be deeply missed, but I’m genuinely excited for what lies ahead for you. Wishing you continued success, happiness, and all the amazing things you deserve in this next chapter.
+
+Thank you for everything, [Name]. You’ll always be remembered fondly.
+
+Warmest regards,
+[Your Name]
