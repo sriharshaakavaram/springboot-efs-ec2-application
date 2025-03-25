@@ -470,3 +470,9 @@ elif action == "Purge Queue":
     if st.button("Purge Queue (Irreversible)"):
         client.purge_queue(QueueUrl=SQS_QUEUE_URL)
         st.success("Queue purged successfully.")
+=====================================
+
+curl -Lo aws_signing_helper.zip https://rolesanywhere.amazonaws.com/downloads/aws_signing_helper/latest/linux/aws_signing_helper.zip
+unzip aws_signing_helper.zip
+chmod +x aws_signing_helper
+sudo mv aws_signing_helper /usr/local/bin/
