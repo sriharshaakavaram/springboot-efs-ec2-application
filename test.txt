@@ -377,3 +377,96 @@ elif action == "Purge Queue":
     if st.button("Purge Queue (Caution!)"):
         client.purge_queue(QueueUrl=SQS_QUEUE_URL)
         st.success("Queue purged!")
+====================================================================
+
+import streamlit as st
+import boto3
+import subprocess
+import json
+
+# === CONFIGURATION ===
+CERTIFICATE_PATH = "certs/certificate.pem"
+PRIVATE_KEY_PATH = "certs/private-key.pem"
+TRUST_ANCHOR_ARN = "arn:aws:rolesanywhere:us-east-1:123456789012:trust-anchor/abc123"
+PROFILE_ARN = "arn:aws:rolesanywhere:us-east-1:123456789012:profile/xyz456"
+ROLE_ARN = "arn:aws:iam::123456789012:role/MySQSRole"
+REGION = "us-east-1"
+SQS_QUEUE_URL = "https://sqs.us-east-1.amazonaws.com/123456789012/my-queue"
+
+# === Fetch Temporary Credentials Using aws_signing_helper ===
+@st.cache_resource
+def get_sqs_client():
+    try:
+        result = subprocess.run(
+            [
+                "aws_signing_helper",
+                "credential-process",
+                "--certificate", CERTIFICATE_PATH,
+                "--private-key", PRIVATE_KEY_PATH,
+                "--trust-anchor-arn", TRUST_ANCHOR_ARN,
+                "--profile-arn", PROFILE_ARN,
+                "--role-arn", ROLE_ARN,
+                "--region", REGION
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True
+        )
+        creds = json.loads(result.stdout)
+
+        session = boto3.Session(
+            aws_access_key_id=creds["AccessKeyId"],
+            aws_secret_access_key=creds["SecretAccessKey"],
+            aws_session_token=creds["SessionToken"],
+            region_name=REGION
+        )
+
+        return session.client("sqs")
+    except subprocess.CalledProcessError as e:
+        st.error(f"Credential error: {e.stderr.decode()}")
+        return None
+
+# === Streamlit UI ===
+st.title("📬 AWS SQS Dashboard (IAM Roles Anywhere)")
+
+client = get_sqs_client()
+
+if not client:
+    st.stop()
+
+action = st.radio("Select an action:", ["Send Message", "Receive Message", "Purge Queue"])
+
+if action == "Send Message":
+    msg = st.text_area("Enter message:")
+    if st.button("Send"):
+        if msg.strip():
+            response = client.send_message(QueueUrl=SQS_QUEUE_URL, MessageBody=msg)
+            st.success(f"Message sent! ID: {response['MessageId']}")
+        else:
+            st.warning("Please enter a message.")
+
+elif action == "Receive Message":
+    if st.button("Receive"):
+        response = client.receive_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MaxNumberOfMessages=1,
+            WaitTimeSeconds=2
+        )
+        messages = response.get("Messages", [])
+        if messages:
+            msg = messages[0]
+            st.write("Message Received:")
+            st.json(msg)
+            if st.button("Delete Message"):
+                client.delete_message(
+                    QueueUrl=SQS_QUEUE_URL,
+                    ReceiptHandle=msg["ReceiptHandle"]
+                )
+                st.success("Message deleted.")
+        else:
+            st.info("No messages in the queue.")
+
+elif action == "Purge Queue":
+    if st.button("Purge Queue (Irreversible)"):
+        client.purge_queue(QueueUrl=SQS_QUEUE_URL)
+        st.success("Queue purged successfully.")
