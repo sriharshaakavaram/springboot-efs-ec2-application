@@ -1,7 +1,24 @@
-import React, { useEffect, useState } from "react";
-import "./App.css";
+import React from "react";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import HelloWorld from "./HelloWorld";
 
 function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/helloWorld" element={<HelloWorld />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
+
+=================================================================
+
+import React, { useEffect, useState } from "react";
+
+function HelloWorld() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -10,11 +27,7 @@ function App() {
       .then(data => setMessage(data));
   }, []);
 
-  return (
-    <div className="App">
-      <h1>{message || "Loading..."}</h1>
-    </div>
-  );
+  return <h1>{message || "Loading..."}</h1>;
 }
 
-export default App;
+export default HelloWorld;
