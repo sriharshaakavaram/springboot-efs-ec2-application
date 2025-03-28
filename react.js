@@ -3,17 +3,27 @@ import "./HelloWorld.css";
 
 function HelloWorld() {
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true); // <- NEW loading flag
 
   useEffect(() => {
     fetch("http://<YOUR_EC2_PUBLIC_IP>:8080/hello")
       .then(res => res.text())
-      .then(data => setMessage(data));
+      .then(data => {
+        setMessage(data);
+        setLoading(false); // <- loading done
+      })
+      .catch(err => {
+        setMessage("Failed to fetch message 😢");
+        setLoading(false);
+      });
   }, []);
 
   return (
     <div className="hello-container">
       <h1 className="hello-heading">Welcome to HelloWorld App 👋</h1>
-      <p className="hello-message">{message || "Loading..."}</p>
+      <p className="hello-message">
+        {loading ? "Loading..." : message}
+      </p>
     </div>
   );
 }
