@@ -484,3 +484,10 @@ Thank you for everything, [Name]. You’ll always be remembered fondly.
 
 Warmest regards,
 [Your Name]
+===============================================================
+
+# Install pip packages and upgrade outdated ones
+RUN pip install --upgrade pip && \
+    pip list --outdated --format=freeze | \
+    cut -d '=' -f 1 | \
+    xargs -n1 pip install -U
